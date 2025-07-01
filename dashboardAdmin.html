@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Verbaly Admin – Dashboard iscritti</title>
+  <style>
+    body { font-family: 'Segoe UI', Arial, sans-serif; background: #f6f8fb; margin: 0; }
+    .admin-container { max-width: 1000px; margin: 36px auto 0 auto; background: #fff; border-radius: 14px; box-shadow: 0 6px 32px #234c8545; padding: 36px 28px 32px 28px; }
+    h1 { color: #1859b1; margin-top: 0; margin-bottom: 18px; }
+    .stat-bar { margin-bottom: 24px; display: flex; gap: 40px; }
+    .stat-box { background: #eaf2fb; color: #1859b1; border-radius: 7px; padding: 14px 22px; font-size: 1.18em; font-weight: bold; }
+    .search-box { margin-bottom: 18px; }
+    input[type="search"] { padding: 7px 16px; border: 1px solid #b9cbe7; border-radius: 7px; font-size: 1.05em; width: 270px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 12px; background: #fff; }
+    th, td { padding: 8px 12px; text-align: left; border-bottom: 1px solid #e1e8f3; font-size: 1em; }
+    th { background: #eaf2fb; color: #234c85; }
+    tr:hover { background: #f3faff; }
+    .export-btn { margin-top: 10px; background: #1859b1; color: #fff; border: none; padding: 8px 18px; border-radius: 5px; font-size: 1em; cursor: pointer; }
+    @media (max-width: 700px) {
+      .admin-container { padding: 12px 3vw; }
+      th, td { font-size: 0.95em; }
+      .stat-bar { flex-direction: column; gap: 8px;}
+    }
+  </style>
+</head>
+<body>
+  <div class="admin-container">
+    <h1>Dashboard iscritti Verbaly</h1>
+    <div class="stat-bar">
+      <div class="stat-box" id="totalCount">Totale iscritti: <span>0</span></div>
+      <div class="stat-box" id="marketingCount">Consenso marketing: <span>0%</span></div>
+    </div>
+    <div class="search-box">
+      <input type="search" id="searchInput" placeholder="Cerca per nome, studio, email..." oninput="filterTable()">
+      <button class="export-btn" onclick="exportCSV()">Esporta CSV</button>
+    </div>
+    <table id="usersTable">
+      <thead>
+        <tr>
+          <th>Nome</th>
+          <th>Studio</th>
+          <th>Email</th>
+          <th>Data iscrizione</th>
+          <th>Privacy</th>
+          <th>Marketing</th>
+        </tr>
+      </thead>
+      <tbody>
+        <!-- Dati da importare qui -->
+      </tbody>
+    </table>
+  </div>
+  <script>
+
+let data = [];
+
+// Sostituisci con il tuo ID foglio Google e il nome del foglio (di solito 'Foglio1')
+const SHEET_ID = "1gkYVcy-7U_xVr9OEtDZ07YtcmJoIP98d9ldiCWV7wPM";
+const SHEET_NAME = "Contatti Verbaly"; 
+
+// Helper per fetch e parsing
+async function fetchSheetData() {
+  const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(SHEET_NAME)}`;
+  const response = await fetch(url);
+  const text = await response.text();
+  const json = JSON.parse(text.substr(47).slice(0, -2));
+  const rows = json.table.rows.map(r => r.c.map(c => c ? c.v : ""));
+  // Mapping colonne: [Nome, Studio, Email, Data, Privacy, Marketing]
+  return rows.map(r => ({
+  nome: r[0],
+  studio: r[1],
+  email: r[2],
+  data: r[3],
+  privacy: r[4],
+  marketing: r[5]
+}));
+}
+
+// Al caricamento, carica i dati live!
+fetchSheetData().then(sheetData => {
+  data = sheetData; // la variabile data già usata dalla tabella
+  renderTable();
+});
+
+
+    // --- Rendering tabella
+    function renderTable(filtered=data) {
+      const tbody = document.querySelector("#usersTable tbody");
+      tbody.innerHTML = "";
+      filtered.forEach(row => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${row.nome}</td>
+                        <td>${row.studio}</td>
+                        <td>${row.email}</td>
+                        <td>${row.data}</td>
+                        <td>${row.privacy}</td>
+                        <td>${row.marketing}</td>`;
+        tbody.appendChild(tr);
+      });
+      document.querySelector("#totalCount span").textContent = filtered.length;
+      const marketingYes = filtered.filter(r=>r.marketing==="si").length;
+      document.querySelector("#marketingCount span").textContent = filtered.length ? Math.round(100*marketingYes/filtered.length) + "%" : "0%";
+    }
+    renderTable();
+
+    // --- Filtro ricerca
+    function filterTable() {
+      const q = document.getElementById("searchInput").value.toLowerCase();
+      renderTable(data.filter(r =>
+        r.nome.toLowerCase().includes(q) ||
+        r.studio.toLowerCase().includes(q) ||
+        r.email.toLowerCase().includes(q)
+      ));
+    }
+
+    // --- Esporta CSV
+    function exportCSV() {
+      const header = ["Nome", "Studio", "Email", "Data", "Privacy", "Marketing"];
+let csv = header.join(",") + "\n";
+data.forEach(r=>{
+  csv += [r.nome, r.studio, r.email, r.data, r.privacy, r.marketing].join(",") + "\n";
+});
+      const blob = new Blob([csv], {type: "text/csv"});
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = "verbaly_iscritti.csv";
+      link.click();
+    }
+  </script>
+</body>
+</html>
